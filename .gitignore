@@ -1,0 +1,9 @@
+/build
+/build_emu
+*.str
+report
+*.dump
+*_lab*.zip
+/test_repo
+*.o
+a.out
