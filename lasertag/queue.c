@@ -49,13 +49,13 @@ queue_size_t queue_size(queue_t *q)
 // Returns true if the queue is full.
 bool queue_full(queue_t *q)
 {
-  return q->elementCount > (q->size - 1);
+    return q->elementCount >= q->size;
 }
  
 // Returns true if the queue is empty.
 bool queue_empty(queue_t *q)
 {
-  return q->elementCount == 1;
+    return q->elementCount == 0;
 }
  
 // If the queue is not full, pushes a new element into the queue and clears the
@@ -63,11 +63,17 @@ bool queue_empty(queue_t *q)
 // message and DO NOT change the queue.
 void queue_push(queue_t *q, queue_data_t value)
 {
+	// if queue isn't full, add given element, increment 
+	// elementCount, set underflowFlag to false, and update indexIn.
+	// otherwise, set overflowFlag and print error message
 	if (!queue_full(q)) {
-		// push a new element
+		q->data[q->indexIn] = value;
+        q->indexIn = (q->indexIn + 1) % q->size;
+		q->elementCount++;
+		q->underflowFlag = false;
 	} else {
 		q->overflowFlag = true;
-		// print error message
+		printf("Error: the queue is full.\n");
 	}
 }
  
@@ -77,12 +83,32 @@ void queue_push(queue_t *q, queue_data_t value)
 // NOT change the queue.
 queue_data_t queue_pop(queue_t *q)
 {
+	// if queue isn't empty, return and remove oldest element, decrement 
+	// elementCount, set overflowFlag to false, and update indexOut.
+	// otherwise, set underflowFlag and print error message
+	if (!queue_empty(q)) {
+        queue_data_t value = q->data[q->indexOut];
+        q->indexOut = (q->indexOut + 1) % q->size;
+        q->elementCount--;
+        q->overflowFlag = false; 
+        return value;
+    } else {
+        q->underflowFlag = true;
+        printf("Error: the queue is empty.\n");
+        return 0;
+    }
 }
  
 // If the queue is full, call queue_pop() and then call queue_push().
 // If the queue is not full, just call queue_push().
 void queue_overwritePush(queue_t *q, queue_data_t value)
 {
+	if (queue_full(q)) {
+		queue_pop(q);
+		queue_push(q, value);
+	} else {
+		queue_push(q, value);
+	}
 }
  
 // Provides random-access read capability to the queue.
@@ -91,6 +117,12 @@ void queue_overwritePush(queue_t *q, queue_data_t value)
 // meaningful error message if an error condition is detected.
 queue_data_t queue_readElementAt(queue_t *q, queue_index_t index)
 {
+	if (index >= 0 && index < q->elementCount) {
+		return q->data[(q->indexOut + index) % q->size];
+	} else {
+		printf("Error: Index %d is out of bounds\n", index);
+		return 0;
+	}
 }
  
 // Returns a count of the elements currently contained in the queue.
