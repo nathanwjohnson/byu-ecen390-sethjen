@@ -1,6 +1,6 @@
 add_executable(lasertag.elf
 main.c
-# queue.c
+queue.c
 # filter.c
 # isr.c
 # trigger.c
