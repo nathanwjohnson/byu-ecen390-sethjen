@@ -8,10 +8,10 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 */
 
 // Uncomment to run tests, various Milestones
- #define RUNNING_MODE_TESTS
+// #define RUNNING_MODE_TESTS
 
 // Uncomment to run Milestone 3, Task 2
-// #define RUNNING_MODE_M3_T2
+#define RUNNING_MODE_M3_T2
 
 // Uncomment to run continuous/shooter mode, Milestone 3, Task 3
 // #define RUNNING_MODE_M3_T3
@@ -72,11 +72,11 @@ int main() {
   interrupts_startArmPrivateTimer();  // start the main timer.
   interrupts_enableArmInts(); // now the ARM processor can see interrupts.
 
-  transmitter_runTestNoncontinuous();
-  transmitter_runTestContinuous();
+  //transmitter_runTestNoncontinuous();
+  //transmitter_runTestContinuous();
   trigger_runTest();
-  hitLedTimer_runTest();
-  lockoutTimer_runTest();
+  //hitLedTimer_runTest();
+  //lockoutTimer_runTest();
 #endif
 
 #ifdef RUNNING_MODE_M3_T3
