@@ -7,3 +7,4 @@ report
 /test_repo
 *.o
 a.out
+.vscode
