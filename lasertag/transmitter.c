@@ -1,12 +1,21 @@
 #include "transmitter.h"
+#include "buttons.h"
 #include "filter.h"
 #include "mio.h"
+#include "switches.h"
+#include "utils.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #define TRANSMITTER_DEBUG true
+#define TRANSMITTER_TEST_BUTTON
+
 #define TRANSMITTER_HIGH_VALUE 1
 #define TRANSMITTER_LOW_VALUE 0
+
+#define TRANSMITTER_TEST_TICK_PERIOD_IN_MS 10
+#define BOUNCE_DELAY 5
 
 // The transmitter state machine generates a square wave output at the chosen
 // frequency as set by transmitter_setFrequencyNumber(). The step counts for the
@@ -21,7 +30,7 @@ static enum transmitter_st_t {
 
 static uint16_t signalTimer = 0;
 static bool continuousModeOn = false;
-static bool runNext = false;
+static bool running = false;
 
 static uint8_t currentFrequency = 0;
 static uint16_t period = 0;
@@ -32,7 +41,7 @@ void transmitter_init() {
 
   signalTimer = 0;
   continuousModeOn = false;
-  runNext = false;
+  running = false;
 
   currentFrequency = 0;
   period = filter_frequencyTickTable[currentFrequency];
@@ -50,9 +59,9 @@ void transmitter_tick() {
     break;
   case wait_st:
     // if the run next flag is true, then move on to sending our signal
-    if (runNext) {
+    if (running) {
       if (!continuousModeOn)
-        runNext = false; // only run once, unluss continuous mode is on
+        running = false; // only run once, unluss continuous mode is on
       mio_writePin(TRANSMITTER_OUTPUT_PIN, TRANSMITTER_HIGH_VALUE);
       period = filter_frequencyTickTable[currentFrequency]; // get the most
                                                             // recent tick count
@@ -101,15 +110,11 @@ void transmitter_tick() {
 }
 
 // Activate the transmitter.
-void transmitter_run() { runNext = true; }
+void transmitter_run() { running = true; }
 
 // Returns true if the transmitter is still running.
 bool transmitter_running() {
-  return (currentState == sig_high_st || currentState == sig_low_st ||
-          runNext == true || continuousModeOn == true)
-             ? true
-             : false;
-  ;
+  return running;
 }
 
 // Sets the frequency number. If this function is called while the
@@ -140,7 +145,27 @@ void transmitter_setContinuousMode(bool continuousModeFlag) {
 
 // Prints out the clock waveform to stdio. Terminates when BTN3 is pressed.
 // Does not use interrupts, but calls the tick function in a loop.
-void transmitter_runTest();
+void transmitter_runTest() {
+  printf("Running transmitter_runTest()\n");
+  transmitter_init();
+
+  while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
+    uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
+
+    transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
+    transmitter_run();                           // Start the transmitter.
+    while (transmitter_running) {
+      transmitter_tick();                                // tick.
+      utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
+    }
+  }
+
+  do {
+    utils_msDelay(BOUNCE_DELAY);
+  } while (buttons_read());
+
+  printf("Exiting transmitter_runTest()\n");
+}
 
 // Tests the transmitter in non-continuous mode.
 // The test runs until BTN3 is pressed.
