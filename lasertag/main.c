@@ -74,8 +74,8 @@ int main() {
 
   //transmitter_runTestNoncontinuous();
   //transmitter_runTestContinuous();
-  trigger_runTest();
-  //hitLedTimer_runTest();
+  //trigger_runTest();
+  hitLedTimer_runTest();
   //lockoutTimer_runTest();
 #endif
 

@@ -23,7 +23,7 @@
 
 #define TRIGGER_GUN_TRIGGER_MIO_PIN 10
 #define GUN_TRIGGER_PRESSED 1
-#define MAX_TICKS 5
+#define MAX_TICKS 5000
 
 volatile static bool ignoreGunInput;
 volatile static bool isEnabled;
@@ -54,6 +54,9 @@ void trigger_init() {
     shotsRemaining = 5;
     currentState = released_st;
     ticks = 0;
+    DPRINTF("line 1\n");
+    DPRINTF("line dsf1\n");
+    DPRINTF("line 1wrr\n");
 
     mio_setPinAsInput(TRIGGER_GUN_TRIGGER_MIO_PIN);
     // If the trigger is pressed when trigger_init() is called, assume that the gun is not connected and ignore it.
@@ -64,55 +67,56 @@ void trigger_init() {
 
 // Standard tick function.
 void trigger_tick() {
-    if (isEnabled) {
-        // State updates
-        switch(currentState) {
-            case released_st:
-                printf("released state1\n");
-                if (ticks >= MAX_TICKS) {
-                    printf("D\n");
-                    ticks = 0;
-                    currentState = pressed_st;
-                }
-                break;
-            case pressed_st:
-                printf("pressed state1\n");
-                if (ticks >= MAX_TICKS) {
-                    printf("U\n");
-                    ticks = 0;
-                    currentState = released_st;
-                }
-                break;
-            default:
-                // print an error message here.
-                break;
-        }
-        
-        // State actions
-        switch(currentState) {
-            case released_st:
-                printf("released state2\n");
-                if (triggerPressed()) {
-                    printf("pressed\n");
-                    ticks++;
-                } else {
-                    ticks = 0;
-                }
-                break;
-            case pressed_st:
-                printf("pressed state2\n");
-                if (!triggerPressed()) {
-                    printf("not pressed\n");
-                    ticks++;
-                } else {
-                    ticks = 0;
-                }
-                break;
-            default:
-                // print an error message here.
-                break;
-        }  
+    if (!isEnabled) {
+        return;
     }
+    // State updates
+    switch(currentState) {
+        case released_st:
+            DPRINTF("\r");
+            if (ticks >= MAX_TICKS) {
+                DPCHAR('D');
+                DPCHAR('\n');
+                ticks = 0;
+                currentState = pressed_st;
+            }
+            break;
+        case pressed_st:
+            DPRINTF("\r");
+            if (ticks >= MAX_TICKS) {
+                DPCHAR('U');
+                DPCHAR('\n');
+                ticks = 0;
+                currentState = released_st;
+            }
+            break;
+        default:
+            DPRINTF("\r");
+            DPRINTF("error");
+            break;
+    }
+    
+    // State actions
+    switch(currentState) {
+        case released_st:
+            if (triggerPressed()) {
+                ticks++;
+            } else {
+                ticks = 0;
+            }
+            break;
+        case pressed_st:
+            if (!triggerPressed()) {
+                ticks++;
+            } else {
+                ticks = 0;
+            }
+            break;
+        default:
+            DPRINTF("\r");
+            DPRINTF("error");
+            break;
+    }  
 }
 
 // Enable the trigger state machine. The trigger state-machine is inactive until
