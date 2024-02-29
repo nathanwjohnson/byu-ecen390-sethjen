@@ -5,5 +5,9 @@
     "[cpp]": {
         "editor.formatOnSave": false,
     },
-    "C_Cpp.clang_format_fallbackStyle": "LLVM"
+    "C_Cpp.clang_format_fallbackStyle": "LLVM",
+    "files.associations": {
+        "mio.h": "c",
+        "intervaltimer.h": "c"
+    }
 }

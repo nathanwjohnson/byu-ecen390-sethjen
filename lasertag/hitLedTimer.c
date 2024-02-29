@@ -15,8 +15,8 @@ volatile static uint64_t ticks;
 
 // States for the controller state machine.
 enum hitLedTimer_st_t {
-	init_st,       // Wait here until the button has been pressed continuously for 50ms
-	running_st         // Wait here until the button has been released continuously for 50ms
+	init_st,           // hit LED off
+	running_st         // hit LED on for 1/2 second
 };
 volatile static enum hitLedTimer_st_t currentState;
 
