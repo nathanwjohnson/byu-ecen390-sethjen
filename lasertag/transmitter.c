@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define TRANSMITTER_DEBUG true
 #define TRANSMITTER_TEST_BUTTON
 
 #define TRANSMITTER_HIGH_VALUE 1
@@ -32,8 +31,19 @@ static uint16_t signalTimer = 0;
 static bool continuousModeOn = false;
 static bool running = false;
 
+static uint32_t pulseWidth = TRANSMITTER_PULSE_WIDTH;
+static bool debugOn = false;
+
 static uint8_t currentFrequency = 0;
 static uint16_t period = 0;
+
+void transmitter_setDebug(bool on) {
+  debugOn = on;
+}
+
+void transmitter_setPulseWidth(uint32_t width) {
+  pulseWidth = width;
+}
 
 // Standard init function.
 void transmitter_init() {
@@ -46,7 +56,7 @@ void transmitter_init() {
   currentFrequency = 0;
   period = filter_frequencyTickTable[currentFrequency];
 
-  mio_init(TRANSMITTER_DEBUG);
+  mio_init(debugOn);
   mio_setPinAsOutput(TRANSMITTER_OUTPUT_PIN);
 }
 
@@ -79,7 +89,7 @@ void transmitter_tick() {
     // If the timer has sent a full transmit pulse, go back to the wait state.
     // If continuous mode is on, then the wait state will handle resetting the
     // period with only a small delay.
-    if (signalTimer > TRANSMITTER_PULSE_WIDTH) {
+    if (signalTimer > pulseWidth) {
       currentState = wait_st;
       // For the second half of the period, stay in the low state. Otherwise
       // move to high.
@@ -147,6 +157,10 @@ void transmitter_setContinuousMode(bool continuousModeFlag) {
 // Does not use interrupts, but calls the tick function in a loop.
 void transmitter_runTest() {
   printf("Running transmitter_runTest()\n");
+
+  transmitter_setDebug(true);
+  transmitter_setPulseWidth(200); // shorten pulse width for readability
+
   transmitter_init();
 
   while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
@@ -164,6 +178,9 @@ void transmitter_runTest() {
     utils_msDelay(BOUNCE_DELAY);
   } while (buttons_read());
 
+  transmitter_setDebug(false);
+  transmitter_setPulseWidth(TRANSMITTER_PULSE_WIDTH);
+
   printf("Exiting transmitter_runTest()\n");
 }
 
@@ -175,7 +192,32 @@ void transmitter_runTest() {
 // spot between 200 ms pulses.
 // Should change frequency in response to the slide switches.
 // Depends on the interrupt handler to call tick function.
-void transmitter_runTestNoncontinuous();
+void transmitter_runTestNoncontinuous() {
+  printf("Running transmitter_runTestNoncontinuous\n");
+
+  transmitter_setDebug(true);
+
+  transmitter_init();
+
+  while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
+    uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
+
+    transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
+    transmitter_run();                           // Start the transmitter.
+    while (transmitter_running) {
+      transmitter_tick();                                // tick.
+      utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
+    }
+  }
+
+  do {
+    utils_msDelay(BOUNCE_DELAY);
+  } while (buttons_read());
+
+  transmitter_setDebug(false);
+
+  printf("Exiting transmitter_runTestNoncontinuous()\n");
+}
 
 // Tests the transmitter in continuous mode.
 // To perform the test, connect the oscilloscope probe
@@ -186,4 +228,29 @@ void transmitter_runTestNoncontinuous();
 // in response to changes in the slide switches.
 // Test runs until BTN3 is pressed.
 // Depends on the interrupt handler to call tick function.
-void transmitter_runTestContinuous();
+void transmitter_runTestContinuous() {
+  printf("Running transmitter_runTestContinuous\n");
+
+  transmitter_setDebug(true);
+
+  transmitter_init();
+
+  while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
+    uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
+
+    transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
+    transmitter_run();                           // Start the transmitter.
+    while (transmitter_running) {
+      transmitter_tick();                                // tick.
+      utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
+    }
+  }
+
+  do {
+    utils_msDelay(BOUNCE_DELAY);
+  } while (buttons_read());
+
+  transmitter_setDebug(false);
+
+  printf("Exiting transmitter_runTestContinuous()\n");
+}
