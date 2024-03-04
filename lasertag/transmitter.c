@@ -45,15 +45,17 @@ void transmitter_setPulseWidth(uint32_t width) {
   pulseWidth = width;
 }
 
+void transmitter_setContinuousModeOn(bool on ) {
+  continuousModeOn = on;
+}
+
 // Standard init function.
 void transmitter_init() {
   currentState = init_st;
 
   signalTimer = 0;
-  continuousModeOn = false;
   running = false;
 
-  currentFrequency = 0;
   period = filter_frequencyTickTable[currentFrequency];
 
   mio_init(debugOn);
@@ -75,6 +77,7 @@ void transmitter_tick() {
       mio_writePin(TRANSMITTER_OUTPUT_PIN, TRANSMITTER_HIGH_VALUE);
       period = filter_frequencyTickTable[currentFrequency]; // get the most
                                                             // recent tick count
+      currentState = sig_high_st;
     }
     break;
   case sig_high_st:
@@ -168,7 +171,7 @@ void transmitter_runTest() {
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
     transmitter_run();                           // Start the transmitter.
-    while (transmitter_running) {
+    while (transmitter_running()) {
       transmitter_tick();                                // tick.
       utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
     }
@@ -196,6 +199,7 @@ void transmitter_runTestNoncontinuous() {
   printf("Running transmitter_runTestNoncontinuous\n");
 
   transmitter_setDebug(true);
+  transmitter_setContinuousModeOn(false);
 
   transmitter_init();
 
@@ -204,7 +208,7 @@ void transmitter_runTestNoncontinuous() {
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
     transmitter_run();                           // Start the transmitter.
-    while (transmitter_running) {
+    while (transmitter_running()) {
       transmitter_tick();                                // tick.
       utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
     }
@@ -232,6 +236,7 @@ void transmitter_runTestContinuous() {
   printf("Running transmitter_runTestContinuous\n");
 
   transmitter_setDebug(true);
+  transmitter_setContinuousModeOn(true);
 
   transmitter_init();
 
@@ -240,10 +245,6 @@ void transmitter_runTestContinuous() {
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
     transmitter_run();                           // Start the transmitter.
-    while (transmitter_running) {
-      transmitter_tick();                                // tick.
-      utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
-    }
   }
 
   do {
