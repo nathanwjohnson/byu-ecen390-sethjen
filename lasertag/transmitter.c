@@ -16,6 +16,9 @@
 #define TRANSMITTER_TEST_TICK_PERIOD_IN_MS 10
 #define BOUNCE_DELAY 5
 
+#define TRANSMITTER_NONCONTINUOUS_DELAY_MS 10
+#define TRANSMITTER_CONTINUOUS_DELAY_MS 5
+
 // The transmitter state machine generates a square wave output at the chosen
 // frequency as set by transmitter_setFrequencyNumber(). The step counts for the
 // frequencies are provided in filter.h
@@ -45,7 +48,7 @@ void transmitter_setPulseWidth(uint32_t width) {
   pulseWidth = width;
 }
 
-void transmitter_setContinuousModeOn(bool on ) {
+void transmitter_setContinuousModeOn(bool on) {
   continuousModeOn = on;
 }
 
@@ -208,10 +211,8 @@ void transmitter_runTestNoncontinuous() {
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
     transmitter_run();                           // Start the transmitter.
-    while (transmitter_running()) {
-      transmitter_tick();                                // tick.
-      utils_msDelay(TRANSMITTER_TEST_TICK_PERIOD_IN_MS); // short delay between ticks.
-    }
+
+    utils_msDelay(TRANSMITTER_NONCONTINUOUS_DELAY_MS); // short delay between reading buttons, sending new run command
   }
 
   do {
@@ -240,11 +241,14 @@ void transmitter_runTestContinuous() {
 
   transmitter_init();
 
+  transmitter_run(); // Give an initial run command
+
   while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
     uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
-    transmitter_run();                           // Start the transmitter.
+
+    utils_msDelay(TRANSMITTER_CONTINUOUS_DELAY_MS); // short delay between checking buttons
   }
 
   do {
