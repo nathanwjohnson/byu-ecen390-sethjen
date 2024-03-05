@@ -32,6 +32,7 @@ void lockoutTimer_tick() {
         case waiting_st:
             break;
         case locked_st:
+            // After waiting half a second, move back to the waiting state
             if (ticks >= LOCKOUT_TIMER_EXPIRE_VALUE) {
                 ticks = 0;
                 shouldStart = false;
@@ -64,11 +65,7 @@ void lockoutTimer_start() {
 
 // Returns true if the timer is running.
 bool lockoutTimer_running() {
-    if (currentState == locked_st) {
-        return true;
-    } else {
-        return false;
-    }
+    return (currentState == locked_st) ? true : false;
 }
 
 // Test function assumes interrupts have been completely enabled and

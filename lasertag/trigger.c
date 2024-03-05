@@ -1,8 +1,10 @@
 #include "trigger.h"
+#include "transmitter.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include "include/mio.h"
 #include "drivers/buttons.h"
+#include "utils.h"
 
 // Uncomment for debug prints
 #define DEBUG
@@ -24,6 +26,7 @@
 #define TRIGGER_GUN_TRIGGER_MIO_PIN 10
 #define GUN_TRIGGER_PRESSED 1
 #define MAX_TICKS 5000
+#define BOUNCE_DELAY 5
 
 volatile static bool ignoreGunInput;
 volatile static bool isEnabled;
@@ -54,9 +57,6 @@ void trigger_init() {
     shotsRemaining = 5;
     currentState = released_st;
     ticks = 0;
-    DPRINTF("line 1\n");
-    DPRINTF("line dsf1\n");
-    DPRINTF("line 1wrr\n");
 
     mio_setPinAsInput(TRIGGER_GUN_TRIGGER_MIO_PIN);
     // If the trigger is pressed when trigger_init() is called, assume that the gun is not connected and ignore it.
@@ -73,16 +73,15 @@ void trigger_tick() {
     // State updates
     switch(currentState) {
         case released_st:
-            DPRINTF("\r");
             if (ticks >= MAX_TICKS) {
                 DPCHAR('D');
                 DPCHAR('\n');
                 ticks = 0;
+                transmitter_run();
                 currentState = pressed_st;
             }
             break;
         case pressed_st:
-            DPRINTF("\r");
             if (ticks >= MAX_TICKS) {
                 DPCHAR('U');
                 DPCHAR('\n');
@@ -91,8 +90,7 @@ void trigger_tick() {
             }
             break;
         default:
-            DPRINTF("\r");
-            DPRINTF("error");
+            DPRINTF("error\n");
             break;
     }
     
@@ -113,8 +111,7 @@ void trigger_tick() {
             }
             break;
         default:
-            DPRINTF("\r");
-            DPRINTF("error");
+            DPRINTF("error\n");
             break;
     }  
 }
@@ -147,5 +144,17 @@ void trigger_setRemainingShotCount(trigger_shotsRemaining_t count) {
 // Depends on the interrupt handler to call tick function.
 void trigger_runTest() {
     printf("starting trigger_runTest()\n");
+
     trigger_enable();
+
+    while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
+    }
+
+    do {
+        utils_msDelay(BOUNCE_DELAY);
+    } while (buttons_read());
+
+    trigger_disable();
+
+    printf("exiting trigger_runTest()\n");
 }

@@ -1,3 +1,4 @@
+#include "buttons.h"
 #include "hitLedTimer.h"
 #include "include/leds.h"
 #include "include/mio.h"
@@ -7,7 +8,8 @@
 // While active, it turns on the LED connected to MIO pin 11
 // and also LED LD0 on the ZYBO board.
 
-#define LED_1 1      // used to turn LED1 on
+#define LED_1 1      // on the Zybo board, used for debugging
+#define BOUNCE_DELAY 5
 
 volatile static bool isEnabled;
 volatile static bool shouldStart;
@@ -111,7 +113,8 @@ void hitLedTimer_enable() {
 // Depends on the interrupt handler to call tick function.
 void hitLedTimer_runTest() {
     hitLedTimer_enable();
-    while (true) {
+
+    while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
         hitLedTimer_start(); // Step 1
 
         // Step 2: Wait until hitLedTimer_running() is false
@@ -119,6 +122,10 @@ void hitLedTimer_runTest() {
             // Do nothing, just wait
         }
 
-        utils_msDelay(300); // Step 3: Delay for 300 ms using utils_msDelay()
+        utils_msDelay(1000); // Step 3: Delay for 1000 ms using utils_msDelay()
     }
+
+    do {
+        utils_msDelay(BOUNCE_DELAY);
+    } while (buttons_read());
 }

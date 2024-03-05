@@ -16,8 +16,7 @@
 #define TRANSMITTER_TEST_TICK_PERIOD_IN_MS 10
 #define BOUNCE_DELAY 5
 
-#define TRANSMITTER_NONCONTINUOUS_DELAY_MS 10
-#define TRANSMITTER_CONTINUOUS_DELAY_MS 5
+#define TRANSMITTER_NONCONTINUOUS_DELAY_MS 500
 
 // The transmitter state machine generates a square wave output at the chosen
 // frequency as set by transmitter_setFrequencyNumber(). The step counts for the
@@ -32,7 +31,7 @@ static enum transmitter_st_t {
 
 static uint16_t signalTimer = 0;
 static bool continuousModeOn = false;
-static bool running = false;
+volatile static bool running = false;
 
 static uint32_t pulseWidth = TRANSMITTER_PULSE_WIDTH;
 static bool debugOn = false;
@@ -80,6 +79,7 @@ void transmitter_tick() {
       mio_writePin(TRANSMITTER_OUTPUT_PIN, TRANSMITTER_HIGH_VALUE);
       period = filter_frequencyTickTable[currentFrequency]; // get the most
                                                             // recent tick count
+      signalTimer = 0;
       currentState = sig_high_st;
     }
     break;
@@ -169,6 +169,7 @@ void transmitter_runTest() {
 
   transmitter_init();
 
+  // Finish loop when button 3 is pressed
   while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
     uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
 
@@ -180,6 +181,7 @@ void transmitter_runTest() {
     }
   }
 
+  // don't continue until all buttons are lifted
   do {
     utils_msDelay(BOUNCE_DELAY);
   } while (buttons_read());
@@ -206,15 +208,18 @@ void transmitter_runTestNoncontinuous() {
 
   transmitter_init();
 
+  // Finish loop when button 3 is pressed
   while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
+    utils_msDelay(TRANSMITTER_NONCONTINUOUS_DELAY_MS); // short delay between reading buttons, sending new run command
     uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
-    transmitter_run();                           // Start the transmitter.
 
-    utils_msDelay(TRANSMITTER_NONCONTINUOUS_DELAY_MS); // short delay between reading buttons, sending new run command
+    transmitter_run();                           // Start the transmitter.
+    while (transmitter_running());
   }
 
+  // don't continue until all buttons are lifted
   do {
     utils_msDelay(BOUNCE_DELAY);
   } while (buttons_read());
@@ -243,18 +248,19 @@ void transmitter_runTestContinuous() {
 
   transmitter_run(); // Give an initial run command
 
+  // Finish loop when button 3 is pressed
   while (!(buttons_read() & BUTTONS_BTN3_MASK)) {
     uint16_t switchValue = switches_read() % FILTER_FREQUENCY_COUNT; // Compute a safe number from the switches.
 
     transmitter_setFrequencyNumber(switchValue); // set the frequency number based upon switch value.
-
-    utils_msDelay(TRANSMITTER_CONTINUOUS_DELAY_MS); // short delay between checking buttons
   }
 
+  // don't continue until all buttons are lifted
   do {
     utils_msDelay(BOUNCE_DELAY);
   } while (buttons_read());
 
+  transmitter_setContinuousModeOn(false);
   transmitter_setDebug(false);
 
   printf("Exiting transmitter_runTestContinuous()\n");
