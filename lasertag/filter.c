@@ -211,7 +211,7 @@ double filter_getCurrentPowerValue(uint16_t filterNumber)
 // Useful in testing the detector.
 void filter_setCurrentPowerValue(uint16_t filterNumber, double value)
 {
-  currentPowerValue[filterNumber] = value;
+    currentPowerValue[filterNumber] = value;
 }
 
 // Get a copy of the current power values.
