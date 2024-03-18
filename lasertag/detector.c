@@ -6,8 +6,51 @@
 #include "hitLedTimer.h"
 #include <stdio.h>
 
-static uint32_t fudgeFactors[3] = {10, 100, 1000};
-static uint8_t fudgeFactorIndex = 2;
+#define FUDGE_FACTOR_DEFAULT_INDEX 2
+#define ADC_MAX_VALUE 4095.0
+#define ADC_SCALAR 2.0
+#define MEDIAN_POWER_SCALAR 2
+#define DEFAULT_PLAYER_HIT 2
+
+#define FILTER_NUMBER_1 0
+#define FILTER_NUMBER_1_FIRST_VALUE 1050
+#define FILTER_NUMBER_2 1
+#define FILTER_NUMBER_2_FIRST_VALUE 20
+#define FILTER_NUMBER_3 2
+#define FILTER_NUMBER_3_FIRST_VALUE 40
+#define FILTER_NUMBER_4 3
+#define FILTER_NUMBER_4_FIRST_VALUE 10
+#define FILTER_NUMBER_5 4
+#define FILTER_NUMBER_5_FIRST_VALUE 15
+#define FILTER_NUMBER_6 5
+#define FILTER_NUMBER_6_FIRST_VALUE 30
+#define FILTER_NUMBER_7 6
+#define FILTER_NUMBER_7_FIRST_VALUE 35
+#define FILTER_NUMBER_8 7
+#define FILTER_NUMBER_8_FIRST_VALUE 15
+#define FILTER_NUMBER_9 8
+#define FILTER_NUMBER_9_FIRST_VALUE 25
+#define FILTER_NUMBER_10 9
+#define FILTER_NUMBER_10_FIRST_VALUE 80
+
+#define FILTER_NUMBER_1_SECOND_VALUE 33
+#define FILTER_NUMBER_2_SECOND_VALUE 22
+#define FILTER_NUMBER_3_SECOND_VALUE 42
+#define FILTER_NUMBER_4_SECOND_VALUE 14
+#define FILTER_NUMBER_5_SECOND_VALUE 17
+#define FILTER_NUMBER_6_SECOND_VALUE 24
+#define FILTER_NUMBER_7_SECOND_VALUE 14
+#define FILTER_NUMBER_8_SECOND_VALUE 16
+#define FILTER_NUMBER_9_SECOND_VALUE 40
+#define FILTER_NUMBER_10_SECOND_VALUE 38
+
+#define NUM_FUDGE_FACTORS 3
+#define FUDGE_FACTOR_1 10
+#define FUDGE_FACTOR_2 100
+#define FUDGE_FACTOR_3 1000
+
+static uint32_t fudgeFactors[NUM_FUDGE_FACTORS] = {FUDGE_FACTOR_1, FUDGE_FACTOR_2, FUDGE_FACTOR_3};
+static uint8_t fudgeFactorIndex = FUDGE_FACTOR_DEFAULT_INDEX;
 
 static bool detector_hitDetectedFlag = false;
 static bool detector_ignoreAllHitsFlag = false;
@@ -32,7 +75,7 @@ void detector_init(void) {
         ignored_frequencyArray[i] = false;
     }
 
-    fudgeFactorIndex = 2;
+    fudgeFactorIndex = FUDGE_FACTOR_DEFAULT_INDEX;
 
     detector_hitDetectedFlag = false;
     detector_ignoreAllHitsFlag = false;
@@ -75,7 +118,7 @@ bool detector_detectHit(double powerValues[]) {
     }
 
     // select the median value
-    double medianValue = powerValuesCopy[(FILTER_FREQUENCY_COUNT / 2 - 1)];
+    double medianValue = powerValuesCopy[(FILTER_FREQUENCY_COUNT / MEDIAN_POWER_SCALAR - 1)];
 
     // if the highest power filter is above the median value * fudge factor, return true
     return (powerValuesCopy[0] > (medianValue * fudgeFactors[fudgeFactorIndex]));
@@ -109,7 +152,7 @@ void detector(bool interruptsCurrentlyEnabled) {
         }
 
         // Scaling the ADC value to a double between -1.0 and 1.0
-        double scaledAdcValue = ((double)rawAdcValue / 4095.0) * 2.0 - 1.0;
+        double scaledAdcValue = ((double)rawAdcValue / ADC_MAX_VALUE) * ADC_SCALAR - 1.0;
 
         filter_addNewInput(scaledAdcValue);
 
@@ -134,13 +177,14 @@ void detector(bool interruptsCurrentlyEnabled) {
 
                 // determine if this is a valid player hit and record it as such if it is
                 if ((detector_detectHit(powerValues)) && (!detector_ignoreAllHitsFlag)) {
-                    uint8_t player_hit = 2;
+                    uint8_t player_hit = DEFAULT_PLAYER_HIT;
                     // find highest power player
                     for (uint8_t i = 0; i < FILTER_FREQUENCY_COUNT; i++) {
                         if (powerValues[i] > powerValues[player_hit])
                             player_hit = i;
                     }
 
+                    // if this is a valid player to be hit by, then register the hit
                     if (!ignored_frequencyArray[player_hit]) {
                         lockoutTimer_start();
                         hitLedTimer_start();
@@ -207,16 +251,16 @@ uint32_t detector_getInvocationCount(void) {
 // on each set. With the same fudge factor, your hit detect algorithm
 // should detect a hit on the first set and not detect a hit on the second.
 void detector_runTest(void) {
-    filter_setCurrentPowerValue(0, 1050);
-    filter_setCurrentPowerValue(1, 20);
-    filter_setCurrentPowerValue(2, 40);
-    filter_setCurrentPowerValue(3, 10);
-    filter_setCurrentPowerValue(4, 15);
-    filter_setCurrentPowerValue(5, 30);
-    filter_setCurrentPowerValue(6, 35);
-    filter_setCurrentPowerValue(7, 15);
-    filter_setCurrentPowerValue(8, 25);
-    filter_setCurrentPowerValue(9, 80);
+    filter_setCurrentPowerValue(FILTER_NUMBER_1, FILTER_NUMBER_1_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_2, FILTER_NUMBER_2_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_3, FILTER_NUMBER_3_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_4, FILTER_NUMBER_4_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_5, FILTER_NUMBER_5_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_6, FILTER_NUMBER_6_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_7, FILTER_NUMBER_7_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_8, FILTER_NUMBER_8_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_9, FILTER_NUMBER_9_FIRST_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_10, FILTER_NUMBER_10_FIRST_VALUE);
 
     detector_setFudgeFactorIndex(0);
 
@@ -226,16 +270,16 @@ void detector_runTest(void) {
 
     printf("hit detected 1: %d\n", hitDetected ? 1 : 0);
 
-    filter_setCurrentPowerValue(0, 33);
-    filter_setCurrentPowerValue(1, 22);
-    filter_setCurrentPowerValue(2, 42);
-    filter_setCurrentPowerValue(3, 14);
-    filter_setCurrentPowerValue(4, 17);
-    filter_setCurrentPowerValue(5, 24);
-    filter_setCurrentPowerValue(6, 14);
-    filter_setCurrentPowerValue(7, 16);
-    filter_setCurrentPowerValue(8, 40);
-    filter_setCurrentPowerValue(9, 38);
+    filter_setCurrentPowerValue(FILTER_NUMBER_1, FILTER_NUMBER_1_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_2, FILTER_NUMBER_2_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_3, FILTER_NUMBER_3_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_4, FILTER_NUMBER_4_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_5, FILTER_NUMBER_5_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_6, FILTER_NUMBER_6_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_7, FILTER_NUMBER_7_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_8, FILTER_NUMBER_8_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_9, FILTER_NUMBER_9_SECOND_VALUE);
+    filter_setCurrentPowerValue(FILTER_NUMBER_10, FILTER_NUMBER_10_SECOND_VALUE);
 
     filter_getCurrentPowerValues(powerValues);
     hitDetected = detector_detectHit(powerValues);

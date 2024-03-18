@@ -4,17 +4,6 @@
 // from the ADC until they are read and processed by the detector.
 // The function of the buffer is similar to a queue or FIFO.
  
-// Uncomment for debug prints
-#define DEBUG
- 
-#if defined(DEBUG)
-#include <stdio.h>
-#include "xil_printf.h" // outbyte
-#define DPRINTF(...) printf(__VA_ARGS__)
-#else
-#define DPRINTF(...)
-#endif
- 
 #define BUFFER_SIZE 32768
  
 typedef struct {
