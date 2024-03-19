@@ -34,33 +34,33 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 // Uncomment this code so that the code in the various modes will
 // ignore your own frequency. You still must properly implement
 // the ability to ignore frequencies in detector.c
-//#define IGNORE_OWN_FREQUENCY 1
+#define IGNORE_OWN_FREQUENCY 1
 
 #define MAX_HIT_COUNT 100000
 
 #define MAX_BUFFER_SIZE 100 // Used for a generic message buffer.
 
-#define DETECTOR_HIT_ARRAY_SIZE                                                \
+#define DETECTOR_HIT_ARRAY_SIZE \
   FILTER_FREQUENCY_COUNT // The array contains one location per user frequency.
 
-#define HISTOGRAM_BAR_COUNT                                                    \
+#define HISTOGRAM_BAR_COUNT \
   FILTER_FREQUENCY_COUNT // As many histogram bars as user filter frequencies.
 
 #define ISR_CUMULATIVE_TIMER INTERVAL_TIMER_TIMER_0 // Used by the ISR.
-#define TOTAL_RUNTIME_TIMER                                                    \
+#define TOTAL_RUNTIME_TIMER \
   INTERVAL_TIMER_TIMER_1 // Used to compute total run-time.
-#define MAIN_CUMULATIVE_TIMER                                                  \
+#define MAIN_CUMULATIVE_TIMER \
   INTERVAL_TIMER_TIMER_2 // Used to compute cumulative run-time in main.
 
-#define SYSTEM_TICKS_PER_HISTOGRAM_UPDATE                                      \
+#define SYSTEM_TICKS_PER_HISTOGRAM_UPDATE \
   30000 // Update the histogram about 3 times per second.
 
-#define RUNNING_MODE_WARNING_TEXT_SIZE 2 // Upsize the text for visibility.
-#define RUNNING_MODE_WARNING_TEXT_COLOR DISPLAY_RED // Red for more visibility.
-#define RUNNING_MODE_NORMAL_TEXT_SIZE 1 // Normal size for reporting.
+#define RUNNING_MODE_WARNING_TEXT_SIZE 2             // Upsize the text for visibility.
+#define RUNNING_MODE_WARNING_TEXT_COLOR DISPLAY_RED  // Red for more visibility.
+#define RUNNING_MODE_NORMAL_TEXT_SIZE 1              // Normal size for reporting.
 #define RUNNING_MODE_NORMAL_TEXT_COLOR DISPLAY_WHITE // White for reporting.
-#define RUNNING_MODE_SCREEN_X_ORIGIN 0 // Origin for reporting text.
-#define RUNNING_MODE_SCREEN_Y_ORIGIN 0 // Origin for reporting text.
+#define RUNNING_MODE_SCREEN_X_ORIGIN 0               // Origin for reporting text.
+#define RUNNING_MODE_SCREEN_Y_ORIGIN 0               // Origin for reporting text.
 
 // Detector should be invoked this often for good performance.
 #define SUGGESTED_DETECTOR_INVOCATIONS_PER_SECOND 30000
@@ -211,7 +211,7 @@ void runningModes_continuous(void) {
   detector_setIgnoredFrequencies(ignoredFrequencies);
 
   uint16_t histogramSystemTicks =
-      0; // Only update the histogram display every so many ticks.
+      0;                              // Only update the histogram display every so many ticks.
   interrupts_enableTimerGlobalInts(); // Allow timer interrupts.
   interrupts_startArmPrivateTimer();  // Start the private ARM timer running.
   intervalTimer_reset(
@@ -225,16 +225,16 @@ void runningModes_continuous(void) {
   interrupts_enableArmInts(); // ARM will now see interrupts after this.
 
   transmitter_setContinuousMode(true); // Run the transmitter continuously.
-  transmitter_run();           // Start the transmitter.
+  transmitter_run();                   // Start the transmitter.
   while (!(buttons_read() &
            BUTTONS_BTN3_MASK)) { // Run until you detect BTN3 pressed.
     transmitter_setFrequencyNumber(runningModes_getFrequencySetting());
-    histogramSystemTicks++;    // Keep track of ticks so you know when to update
-                               // the histogram.
+    histogramSystemTicks++; // Keep track of ticks so you know when to update
+                            // the histogram.
     // Run filters, compute power, etc.
     intervalTimer_start(MAIN_CUMULATIVE_TIMER); // Measure run-time when you are
                                                 // doing something.
-    detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
+    detector(INTERRUPTS_CURRENTLY_ENABLED);     // Interrupts are currently enabled.
     intervalTimer_stop(MAIN_CUMULATIVE_TIMER);
     // If enough ticks have transpired, update the histogram.
     if (histogramSystemTicks >= SYSTEM_TICKS_PER_HISTOGRAM_UPDATE) {
@@ -273,7 +273,7 @@ void runningModes_shooter(void) {
 #endif
   detector_setIgnoredFrequencies(ignoredFrequencies);
 
-  trigger_enable(); // Makes the state machine responsive to the trigger.
+  trigger_enable();                   // Makes the state machine responsive to the trigger.
   interrupts_enableTimerGlobalInts(); // Allow timer interrupts.
   interrupts_startArmPrivateTimer();  // Start the private ARM timer running.
   intervalTimer_reset(
@@ -285,8 +285,8 @@ void runningModes_shooter(void) {
   intervalTimer_start(
       TOTAL_RUNTIME_TIMER);   // Start measuring total execution time.
   interrupts_enableArmInts(); // ARM will now see interrupts after this.
-  lockoutTimer_start(); // Ignore erroneous hits at startup (when all power
-                        // values are essentially 0).
+  lockoutTimer_start();       // Ignore erroneous hits at startup (when all power
+                              // values are essentially 0).
 
   while ((!(buttons_read() & BUTTONS_BTN3_MASK)) &&
          hitCount < MAX_HIT_COUNT) { // Run until you detect BTN3 pressed.
@@ -308,8 +308,8 @@ void runningModes_shooter(void) {
     intervalTimer_stop(
         MAIN_CUMULATIVE_TIMER); // All done with actual processing.
   }
-  interrupts_disableArmInts(); // Done with loop, disable the interrupts.
-  hitLedTimer_turnLedOff();    // Save power :-)
+  interrupts_disableArmInts();           // Done with loop, disable the interrupts.
+  hitLedTimer_turnLedOff();              // Save power :-)
   runningModes_printRunTimeStatistics(); // Print the run-time statistics.
   printf("Shooter mode terminated after detecting %d hits.\n", hitCount);
 }
