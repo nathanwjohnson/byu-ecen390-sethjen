@@ -23,12 +23,15 @@ The code in runningModes.c can be an example for implementing the game here.
 #include "sound/sound.h"
 #include "switches.h"
 #include "trigger.h"
+#include "transmitter.h"
+#include "lockoutTimer.h"
+#include "histogram.h"
 
 #define STARTING_LIVES 3
 #define STARTING_BULLETS 10
 #define HITS_PER_LIFE 5
-#define TEAM_A_FREQUENCY 6
-#define TEAM_B_FREQUENCY 9
+#define TEAM_A_FREQUENCY 5
+#define TEAM_B_FREQUENCY 8
 
 #define DETECTOR_HIT_ARRAY_SIZE \
   FILTER_FREQUENCY_COUNT // The array contains one location per user frequency.
@@ -62,7 +65,8 @@ void reload() {
 void game_twoTeamTag(void) {
   uint16_t hitCount = 0;
   runningModes_initAll();
-  sound_setVolume(sound_maximumVolume_e);
+  sound_setVolume(sound_mediumHighVolume_e);
+  sound_setSound(sound_gameStart_e);
   sound_startSound();
 
   // Configuration...
@@ -72,20 +76,24 @@ void game_twoTeamTag(void) {
 
   bool reloadTriggerTimerRunning = false;
 
-  // Init the ignored-frequencies so no frequencies are ignored.
   bool ignoredFrequencies[FILTER_FREQUENCY_COUNT];
   for (uint16_t i = 0; i < FILTER_FREQUENCY_COUNT; i++)
     ignoredFrequencies[i] = true;
 
-  detector_setIgnoredFrequencies(ignoredFrequencies);
-
   // read switch 0 to determine team membership
   uint16_t switchSetting = switches_read() & SWITCHES_SW0_MASK; // Bit-mask the results.
-
   if (switchSetting) { // Team B
-
+    transmitter_setFrequencyNumber(TEAM_B_FREQUENCY);
+    ignoredFrequencies[TEAM_A_FREQUENCY] = false;
+    ignoredFrequencies[TEAM_B_FREQUENCY] = false; // TODO remove
+    printf("B\n");
   } else { // Team A
+    transmitter_setFrequencyNumber(TEAM_A_FREQUENCY);
+    ignoredFrequencies[TEAM_B_FREQUENCY] = false;
+    ignoredFrequencies[TEAM_A_FREQUENCY] = false; // TODO remove
+    printf("A\n");
   }
+  detector_setIgnoredFrequencies(ignoredFrequencies);
 
   trigger_enable();                          // Makes the state machine responsive to the trigger.
   interrupts_enableTimerGlobalInts();        // Allow timer interrupts.
