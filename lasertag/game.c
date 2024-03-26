@@ -22,6 +22,7 @@ The code in runningModes.c can be an example for implementing the game here.
 #include "runningModes.h"
 #include "sound/sound.h"
 #include "switches.h"
+#include "trigger.h"
 
 #define STARTING_LIVES 3
 #define STARTING_BULLETS 10
@@ -41,6 +42,14 @@ The code in runningModes.c can be an example for implementing the game here.
   INTERVAL_TIMER_TIMER_1 // Used to compute total run-time.
 #define RELOAD_TRIGGER_LENGTH_S 3
 
+volatile static uint8_t bulletsLeft = STARTING_BULLETS;
+
+// Reload the gun by resetting number of bullets in the gun and playing a reload sound
+void reload() {
+  bulletsLeft = STARTING_BULLETS;
+  // TODO: Play a reload sound
+}
+
 // This game supports two teams, Team-A and Team-B.
 // Each team operates on its own configurable frequency.
 // Each player has a fixed set of lives and once they
@@ -59,8 +68,9 @@ void game_twoTeamTag(void) {
   // Configuration...
 
   uint8_t livesLeft = STARTING_LIVES;
-  uint8_t bulletsLeft = STARTING_BULLETS;
   bool gameOver = false;
+
+  bool reloadTriggerTimerRunning = false;
 
   // Init the ignored-frequencies so no frequencies are ignored.
   bool ignoredFrequencies[FILTER_FREQUENCY_COUNT];
@@ -90,23 +100,34 @@ void game_twoTeamTag(void) {
 
     // Run filters, compute power, run hit-detection.
     detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
-    if (detector_hitDetected()) {           // Hit detected
-      hitCount++;                           // increment the hit count.
-      detector_clearHit();                  // Clear the hit.
+
+    // If there is a hit detected, handle it
+    if (detector_hitDetected()) { // Hit detected
+      hitCount++;                 // increment the hit count.
+      detector_clearHit();        // Clear the hit.
       detector_hitCount_t
           hitCounts[DETECTOR_HIT_ARRAY_SIZE]; // Store the hit-counts here.
       detector_getHitCounts(hitCounts);       // Get the current hit counts.
       histogram_plotUserHits(hitCounts);      // Plot the hit counts on the TFT.
     }
 
-    // if (intervalTimer_getTotalDurationInSeconds(RELOAD_TRIGGER_TIMER) > RELOAD_TRIGGER_LENGTH_S)
+    // If the trigger is pressed, start a timer
+    if (trigger_isPressed()) {
+      if (!reloadTriggerTimerRunning) {
+        intervalTimer_start(RELOAD_TRIGGER_TIMER);
+        reloadTriggerTimerRunning = true;
+      }
+    } else if (reloadTriggerTimerRunning) {
+      // if the trigger isn't pressed but the trigger timer is still running, stop and reset the timer.
+      intervalTimer_stop(RELOAD_TRIGGER_TIMER);
+      reloadTriggerTimerRunning = false;
+      intervalTimer_reset(RELOAD_TRIGGER_TIMER);
+    }
 
-    // if (/* trigger pulled  && reload trigger not running*/) {
-    //   intervalTimer_start(RELOAD_TRIGGER_TIMER);
-    // }
-
-    // The player may force a reload of the clip at any time by pulling and holding the trigger for 3 seconds (if the clip contains shots, the initial push of the trigger will fire a shot).
-    // Immediately after losing a life, a player is invincible for 5 seconds thus giving them time to quickly scurry away. Note that you are not allowed to shoot while invincible.
+    // if the trigger has been pulled for 3 or more seconds, stop & reset the timer and manually reload.
+    if (intervalTimer_getTotalDurationInSeconds(RELOAD_TRIGGER_TIMER) >= RELOAD_TRIGGER_LENGTH_S) {
+      reload();
+    }
   }
 
   // End game loop...
