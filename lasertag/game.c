@@ -13,12 +13,15 @@ The code in runningModes.c can be an example for implementing the game here.
 
 #include <stdio.h>
 
+#include "detector.h"
+#include "filter.h"
 #include "hitLedTimer.h"
 #include "interrupts.h"
+#include "intervalTimer.h"
+#include "invincibilityTimer.h"
 #include "runningModes.h"
 #include "sound/sound.h"
 #include "switches.h"
-#include "filter.h"
 
 #define STARTING_LIVES 3
 #define STARTING_BULLETS 10
@@ -26,7 +29,17 @@ The code in runningModes.c can be an example for implementing the game here.
 #define TEAM_A_FREQUENCY 6
 #define TEAM_B_FREQUENCY 9
 
-#define re
+#define DETECTOR_HIT_ARRAY_SIZE \
+  FILTER_FREQUENCY_COUNT // The array contains one location per user frequency.
+
+// Defined to make things more readable.
+#define INTERRUPTS_CURRENTLY_ENABLED true
+#define INTERRUPTS_CURRENTLY_DISABLE false
+
+#define ISR_CUMULATIVE_TIMER INTERVAL_TIMER_TIMER_0 // Used by the ISR.
+#define RELOAD_TRIGGER_TIMER \
+  INTERVAL_TIMER_TIMER_1 // Used to compute total run-time.
+#define RELOAD_TRIGGER_LENGTH_S 3
 
 // This game supports two teams, Team-A and Team-B.
 // Each team operates on its own configurable frequency.
@@ -47,9 +60,7 @@ void game_twoTeamTag(void) {
 
   uint8_t livesLeft = STARTING_LIVES;
   uint8_t bulletsLeft = STARTING_BULLETS;
-
-    The player may force a reload of the clip at any time by pulling and holding the trigger for 3 seconds (if the clip contains shots, the initial push of the trigger will fire a shot).
-    Immediately after losing a life, a player is invincible for 5 seconds thus giving them time to quickly scurry away. Note that you are not allowed to shoot while invincible.
+  bool gameOver = false;
 
   // Init the ignored-frequencies so no frequencies are ignored.
   bool ignoredFrequencies[FILTER_FREQUENCY_COUNT];
@@ -64,32 +75,19 @@ void game_twoTeamTag(void) {
   if (switchSetting) { // Team B
 
   } else { // Team A
-
   }
 
-  trigger_enable();                   // Makes the state machine responsive to the trigger.
-  interrupts_enableTimerGlobalInts(); // Allow timer interrupts.
-  interrupts_startArmPrivateTimer();  // Start the private ARM timer running.
-  intervalTimer_reset(
-      ISR_CUMULATIVE_TIMER); // Used to measure ISR execution time.
-  intervalTimer_reset(
-      TOTAL_RUNTIME_TIMER); // Used to measure total program execution time.
-  intervalTimer_reset(
-      MAIN_CUMULATIVE_TIMER); // Used to measure main-loop execution time.
-  intervalTimer_start(
-      TOTAL_RUNTIME_TIMER);   // Start measuring total execution time.
-  interrupts_enableArmInts(); // ARM will now see interrupts after this.
-  lockoutTimer_start();       // Ignore erroneous hits at startup (when all power
-                              // values are essentially 0).
+  trigger_enable();                          // Makes the state machine responsive to the trigger.
+  interrupts_enableTimerGlobalInts();        // Allow timer interrupts.
+  interrupts_startArmPrivateTimer();         // Start the private ARM timer running.
+  interrupts_enableArmInts();                // ARM will now see interrupts after this.
+  lockoutTimer_start();                      // Ignore erroneous hits at startup (when all power
+                                             // values are essentially 0).
+  intervalTimer_reset(RELOAD_TRIGGER_TIMER); // Used to measure main-loop execution time.
 
   // Implement game loop...
-  while ((!(buttons_read() & BUTTONS_BTN3_MASK)) &&
-         hitCount < MAX_HIT_COUNT) { // Run until you detect BTN3 pressed.
-    transmitter_setFrequencyNumber(
-        runningModes_getFrequencySetting());    // Read the switches and switch
-                                                // frequency as required.
-    intervalTimer_start(MAIN_CUMULATIVE_TIMER); // Measure run-time when you are
-                                                // doing something.
+  while (!gameOver) { // Run until you detect BTN3 pressed.
+
     // Run filters, compute power, run hit-detection.
     detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
     if (detector_hitDetected()) {           // Hit detected
@@ -100,13 +98,19 @@ void game_twoTeamTag(void) {
       detector_getHitCounts(hitCounts);       // Get the current hit counts.
       histogram_plotUserHits(hitCounts);      // Plot the hit counts on the TFT.
     }
-    intervalTimer_stop(
-        MAIN_CUMULATIVE_TIMER); // All done with actual processing.
+
+    // if (intervalTimer_getTotalDurationInSeconds(RELOAD_TRIGGER_TIMER) > RELOAD_TRIGGER_LENGTH_S)
+
+    // if (/* trigger pulled  && reload trigger not running*/) {
+    //   intervalTimer_start(RELOAD_TRIGGER_TIMER);
+    // }
+
+    // The player may force a reload of the clip at any time by pulling and holding the trigger for 3 seconds (if the clip contains shots, the initial push of the trigger will fire a shot).
+    // Immediately after losing a life, a player is invincible for 5 seconds thus giving them time to quickly scurry away. Note that you are not allowed to shoot while invincible.
   }
 
   // End game loop...
-  interrupts_disableArmInts(); // Done with game loop, disable the interrupts.
-  hitLedTimer_turnLedOff();    // Save power :-)
+  interrupts_disableArmInts();           // Done with game loop, disable the interrupts.
+  hitLedTimer_turnLedOff();              // Save power :-)
   runningModes_printRunTimeStatistics(); // Print the run-time statistics.
 }
-
