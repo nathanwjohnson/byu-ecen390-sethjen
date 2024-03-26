@@ -9,7 +9,7 @@ hitLedTimer.c
 lockoutTimer.c
 buffer.c
 detector.c
-# game.c
+game.c
 )
 
 include_directories(. sound)

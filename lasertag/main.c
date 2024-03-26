@@ -14,10 +14,10 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 // #define RUNNING_MODE_M3_T2
 
 // Uncomment to run continuous/shooter mode, Milestone 3, Task 3
-#define RUNNING_MODE_M3_T3
+// #define RUNNING_MODE_M3_T3
 
 // Uncomment to run two-player mode, Milestone 5
-// #define RUNNING_MODE_M5
+#define RUNNING_MODE_M5
 
 #include <assert.h>
 #include <stdio.h>
@@ -57,8 +57,8 @@ int main() {
   //filter_runTest(); // M3 T1
   // transmitter_runTest(); // M3 T2
   // buffer_runTest(); // M3 T3
-  detector_runTest(); // M3 T3
-  // sound_runTest(); // M5
+  // detector_runTest(); // M3 T3
+  sound_runTest(); // M5
 #endif
 
 #ifdef RUNNING_MODE_M3_T2

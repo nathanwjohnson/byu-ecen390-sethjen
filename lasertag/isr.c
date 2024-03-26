@@ -5,6 +5,7 @@
 #include "lockoutTimer.h"
 #include "transmitter.h"
 #include "trigger.h"
+#include "sound/sound.h"
 
 // The interrupt service routine (ISR) is implemented here.
 // Add function calls for state machine tick functions and
@@ -17,7 +18,7 @@ void isr_init() {
   lockoutTimer_init();
   transmitter_init();
   buffer_init();
-
+  sound_init();
   hitLedTimer_enable();
 }
 
@@ -27,7 +28,7 @@ void isr_function() {
   hitLedTimer_tick();
   lockoutTimer_tick();
   transmitter_tick();
-
+  sound_tick();
   // Grab data from the ADC and store it in the ADC buffer
   buffer_pushover(interrupts_getAdcData());
 }
