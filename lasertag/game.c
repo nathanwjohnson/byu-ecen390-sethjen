@@ -18,7 +18,6 @@ The code in runningModes.c can be an example for implementing the game here.
 #include "hitLedTimer.h"
 #include "interrupts.h"
 #include "intervalTimer.h"
-#include "invincibilityTimer.h"
 #include "runningModes.h"
 #include "sound/sound.h"
 #include "switches.h"
@@ -30,11 +29,13 @@ The code in runningModes.c can be an example for implementing the game here.
 
 #define STARTING_LIVES 3
 #define STARTING_BULLETS 10
+#define STARTING_HITS 5
 #define HITS_PER_LIFE 5
-#define TEAM_A_FREQUENCY 5
-#define TEAM_B_FREQUENCY 8
+#define TEAM_A_FREQUENCY 6
+#define TEAM_B_FREQUENCY 9
 #define TRIGGER_GUN_TRIGGER_MIO_PIN 10
 #define GUN_TRIGGER_PRESSED 1
+#define INVINCIBILITY_TIME 5
 
 #define DETECTOR_HIT_ARRAY_SIZE \
   FILTER_FREQUENCY_COUNT // The array contains one location per user frequency.
@@ -46,9 +47,13 @@ The code in runningModes.c can be an example for implementing the game here.
 #define ISR_CUMULATIVE_TIMER INTERVAL_TIMER_TIMER_0 // Used by the ISR.
 #define RELOAD_TRIGGER_TIMER \
   INTERVAL_TIMER_TIMER_1 // Used to compute total run-time.
+#define INVINCIBILITY_TIMER \
+  INTERVAL_TIMER_TIMER_2 // Used to compute total run-time.
 #define RELOAD_TRIGGER_LENGTH_S 3
 
 volatile static uint16_t bulletsLeft = STARTING_BULLETS;
+volatile static uint16_t livesLeft = STARTING_LIVES;
+volatile static uint16_t hitsLeft = STARTING_HITS;
 
 // Trigger can be activated by either btn0 or the external gun that is attached to TRIGGER_GUN_TRIGGER_MIO_PIN
 // Gun input is ignored if the gun-input is high when the init() function is invoked.
@@ -72,11 +77,14 @@ void game_twoTeamTag(void) {
   sound_setSound(sound_gameStart_e);
   sound_startSound();
   intervalTimer_init(RELOAD_TRIGGER_TIMER);
+  intervalTimer_init(INVINCIBILITY_TIMER);
 
   // Configuration...
 
-  uint8_t livesLeft = STARTING_LIVES;
+  livesLeft = STARTING_LIVES;
   bool gameOver = false;
+  bool invincible = false;
+  bool playerIsDead = false;
 
   bool reloadTriggerTimerRunning = false;
   bool autoReloadTimerRunning = false;
@@ -90,26 +98,65 @@ void game_twoTeamTag(void) {
   if (switchSetting) { // Team B
     transmitter_setFrequencyNumber(TEAM_B_FREQUENCY);
     ignoredFrequencies[TEAM_A_FREQUENCY] = false;
-    ignoredFrequencies[TEAM_B_FREQUENCY] = false; // TODO remove
+    // ignoredFrequencies[TEAM_B_FREQUENCY] = false; // TODO remove, lets you shoot yourself
     printf("Team B\n");
   } else { // Team A
     transmitter_setFrequencyNumber(TEAM_A_FREQUENCY);
     ignoredFrequencies[TEAM_B_FREQUENCY] = false;
-    ignoredFrequencies[TEAM_A_FREQUENCY] = false; // TODO remove
+    // ignoredFrequencies[TEAM_A_FREQUENCY] = false; // TODO remove
     printf("Team A\n");
   }
   detector_setIgnoredFrequencies(ignoredFrequencies);
 
-  trigger_enable();                          // Makes the state machine responsive to the trigger.
   interrupts_enableTimerGlobalInts();        // Allow timer interrupts.
   interrupts_startArmPrivateTimer();         // Start the private ARM timer running.
   interrupts_enableArmInts();                // ARM will now see interrupts after this.
   lockoutTimer_start();                      // Ignore erroneous hits at startup (when all power
                                              // values are essentially 0).
-  intervalTimer_reset(RELOAD_TRIGGER_TIMER); // Used to measure main-loop execution time.
+  intervalTimer_reset(RELOAD_TRIGGER_TIMER); 
+  intervalTimer_reset(INVINCIBILITY_TIMER); 
+  
+  // clears the first hit on startup
+  while (sound_isBusy()) {
+    // Run filters, compute power, run hit-detection.
+    detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
+    detector_clearHit();
+  }
+
+  trigger_enable();                          // Makes the state machine responsive to the trigger.
 
   // Implement game loop...
   while (!gameOver) { // Run until you detect BTN3 pressed.
+    if (playerIsDead) {
+      if (intervalTimer_getTotalDurationInSeconds(INVINCIBILITY_TIMER) >= INVINCIBILITY_TIME) {
+        if (!sound_isBusy()) {
+          sound_setSound(sound_returnToBase_e);
+          sound_startSound();
+          intervalTimer_stop(INVINCIBILITY_TIMER);
+          intervalTimer_reset(INVINCIBILITY_TIMER);
+          intervalTimer_start(INVINCIBILITY_TIMER);
+        }
+      }
+      continue;
+    }
+    if (invincible) {
+      if (intervalTimer_getTotalDurationInSeconds(INVINCIBILITY_TIMER) >= INVINCIBILITY_TIME) {
+        intervalTimer_stop(INVINCIBILITY_TIMER);
+        invincible = false;
+        intervalTimer_reset(INVINCIBILITY_TIMER);
+
+        // not sure if is supposed to, but I have it reload the bullets after you lose a life
+        trigger_setRemainingShotCount(STARTING_BULLETS);
+        bulletsLeft = STARTING_BULLETS;
+        // Run filters, compute power, run hit-detection.
+        detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
+        detector_clearHit();
+      }
+      trigger_disable();
+      continue;
+    } else {
+      trigger_enable();
+    }
 
     // Run filters, compute power, run hit-detection.
     detector(INTERRUPTS_CURRENTLY_ENABLED); // Interrupts are currently enabled.
@@ -119,9 +166,35 @@ void game_twoTeamTag(void) {
       hitCount++;                 // increment the hit count.
       detector_clearHit();        // Clear the hit.
       detector_hitCount_t
-          hitCounts[DETECTOR_HIT_ARRAY_SIZE]; // Store the hit-counts here.
+        hitCounts[DETECTOR_HIT_ARRAY_SIZE]; // Store the hit-counts here.
       detector_getHitCounts(hitCounts);       // Get the current hit counts.
       histogram_plotUserHits(hitCounts);      // Plot the hit counts on the TFT.
+
+      hitsLeft--;
+      printf("hits left: %d\n", hitsLeft);
+      sound_setSound(sound_hit_e);
+      sound_startSound();
+
+      // if you have been hit five times, lose a life
+      if (hitsLeft == 0) {
+        hitsLeft = STARTING_HITS;
+        livesLeft--;
+        printf("lives left: %d\n", livesLeft);
+        if (livesLeft == 0) { // you are now dead, play gameover sound
+          playerIsDead = true;
+          trigger_disable();
+          sound_setSound(sound_gameOver_e);
+          sound_startSound();
+          intervalTimer_start(INVINCIBILITY_TIMER);
+        } else { // start 5 second invincibility timer
+          intervalTimer_start(INVINCIBILITY_TIMER);
+          invincible = true;
+
+          // play losing a life sound
+          sound_setSound(sound_loseLife_e);
+          sound_startSound();
+        }
+      }
     }
 
     // If the trigger is pressed, start a timer
@@ -166,14 +239,6 @@ void game_twoTeamTag(void) {
         sound_startSound();
       }
     }
-
-    // // if gun is fired and is out of bullets, play click sound and wait 3 seconds to reload
-    // if (trigger_getRemainingShotCount() == 65535) {
-    //   printf("gun empty\n");
-    //   trigger_setRemainingShotCount(65534); // just so it does not play this sound again
-    //   sound_setSound(sound_gunClick_e);
-    //   sound_startSound();
-    // }
   }
 
   // End game loop...
