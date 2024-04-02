@@ -26,12 +26,15 @@ The code in runningModes.c can be an example for implementing the game here.
 #include "transmitter.h"
 #include "lockoutTimer.h"
 #include "histogram.h"
+#include "include/mio.h"
 
 #define STARTING_LIVES 3
 #define STARTING_BULLETS 10
 #define HITS_PER_LIFE 5
 #define TEAM_A_FREQUENCY 5
 #define TEAM_B_FREQUENCY 8
+#define TRIGGER_GUN_TRIGGER_MIO_PIN 10
+#define GUN_TRIGGER_PRESSED 1
 
 #define DETECTOR_HIT_ARRAY_SIZE \
   FILTER_FREQUENCY_COUNT // The array contains one location per user frequency.
@@ -45,12 +48,12 @@ The code in runningModes.c can be an example for implementing the game here.
   INTERVAL_TIMER_TIMER_1 // Used to compute total run-time.
 #define RELOAD_TRIGGER_LENGTH_S 3
 
-volatile static uint8_t bulletsLeft = STARTING_BULLETS;
+volatile static uint16_t bulletsLeft = STARTING_BULLETS;
 
-// Reload the gun by resetting number of bullets in the gun and playing a reload sound
-void reload() {
-  bulletsLeft = STARTING_BULLETS;
-  // TODO: Play a reload sound
+// Trigger can be activated by either btn0 or the external gun that is attached to TRIGGER_GUN_TRIGGER_MIO_PIN
+// Gun input is ignored if the gun-input is high when the init() function is invoked.
+bool triggerIsPressed() {
+  return (mio_readPin(TRIGGER_GUN_TRIGGER_MIO_PIN) == GUN_TRIGGER_PRESSED);
 }
 
 // This game supports two teams, Team-A and Team-B.
@@ -68,6 +71,7 @@ void game_twoTeamTag(void) {
   sound_setVolume(sound_mediumHighVolume_e);
   sound_setSound(sound_gameStart_e);
   sound_startSound();
+  intervalTimer_init(RELOAD_TRIGGER_TIMER);
 
   // Configuration...
 
@@ -75,6 +79,7 @@ void game_twoTeamTag(void) {
   bool gameOver = false;
 
   bool reloadTriggerTimerRunning = false;
+  bool autoReloadTimerRunning = false;
 
   bool ignoredFrequencies[FILTER_FREQUENCY_COUNT];
   for (uint16_t i = 0; i < FILTER_FREQUENCY_COUNT; i++)
@@ -86,12 +91,12 @@ void game_twoTeamTag(void) {
     transmitter_setFrequencyNumber(TEAM_B_FREQUENCY);
     ignoredFrequencies[TEAM_A_FREQUENCY] = false;
     ignoredFrequencies[TEAM_B_FREQUENCY] = false; // TODO remove
-    printf("B\n");
+    printf("Team B\n");
   } else { // Team A
     transmitter_setFrequencyNumber(TEAM_A_FREQUENCY);
     ignoredFrequencies[TEAM_B_FREQUENCY] = false;
     ignoredFrequencies[TEAM_A_FREQUENCY] = false; // TODO remove
-    printf("A\n");
+    printf("Team A\n");
   }
   detector_setIgnoredFrequencies(ignoredFrequencies);
 
@@ -120,12 +125,12 @@ void game_twoTeamTag(void) {
     }
 
     // If the trigger is pressed, start a timer
-    if (trigger_isPressed()) {
-      if (!reloadTriggerTimerRunning) {
+    if (triggerIsPressed()) {
+      if (!reloadTriggerTimerRunning && !autoReloadTimerRunning) {
         intervalTimer_start(RELOAD_TRIGGER_TIMER);
         reloadTriggerTimerRunning = true;
       }
-    } else if (reloadTriggerTimerRunning) {
+    } else if (reloadTriggerTimerRunning && !autoReloadTimerRunning) {
       // if the trigger isn't pressed but the trigger timer is still running, stop and reset the timer.
       intervalTimer_stop(RELOAD_TRIGGER_TIMER);
       reloadTriggerTimerRunning = false;
@@ -134,8 +139,41 @@ void game_twoTeamTag(void) {
 
     // if the trigger has been pulled for 3 or more seconds, stop & reset the timer and manually reload.
     if (intervalTimer_getTotalDurationInSeconds(RELOAD_TRIGGER_TIMER) >= RELOAD_TRIGGER_LENGTH_S) {
-      reload();
+      printf("Reload\n");
+      trigger_setRemainingShotCount(STARTING_BULLETS);
+      bulletsLeft = STARTING_BULLETS;
+      sound_setSound(sound_gunReload_e);
+      sound_startSound();
+      intervalTimer_stop(RELOAD_TRIGGER_TIMER);
+      reloadTriggerTimerRunning = false;
+      autoReloadTimerRunning = false;
+      intervalTimer_reset(RELOAD_TRIGGER_TIMER);
     }
+
+    // this will be true once for every bullet fired
+    if (trigger_getRemainingShotCount() != bulletsLeft) {
+      bulletsLeft--;
+      // if gun is fired and is out of bullets, play click sound and wait 3 seconds to reload
+      if (bulletsLeft > STARTING_BULLETS) {
+        printf("gun empty\n");
+        sound_setSound(sound_gunClick_e);
+        sound_startSound();
+        intervalTimer_start(RELOAD_TRIGGER_TIMER);
+        autoReloadTimerRunning = true;
+      } else { // play firing sound
+        printf("shots left: %d\n", bulletsLeft);
+        sound_setSound(sound_gunFire_e);
+        sound_startSound();
+      }
+    }
+
+    // // if gun is fired and is out of bullets, play click sound and wait 3 seconds to reload
+    // if (trigger_getRemainingShotCount() == 65535) {
+    //   printf("gun empty\n");
+    //   trigger_setRemainingShotCount(65534); // just so it does not play this sound again
+    //   sound_setSound(sound_gunClick_e);
+    //   sound_startSound();
+    // }
   }
 
   // End game loop...

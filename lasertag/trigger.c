@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 // Uncomment for debug prints
-#define DEBUG
+// #define DEBUG
 
 #if defined(DEBUG)
 #include "xil_printf.h"
@@ -55,7 +55,7 @@ bool triggerPressed() {
 void trigger_init() {
 
   isEnabled = false;
-  shotsRemaining = 5;
+  shotsRemaining = 10;
   triggerPressedFlag = false;
   currentState = released_st;
   ticks = 0;
@@ -79,7 +79,10 @@ void trigger_tick() {
       DPCHAR('D');
       DPCHAR('\n');
       ticks = 0;
-      transmitter_run();
+      if (shotsRemaining > 0 && shotsRemaining <= 10) {
+        transmitter_run();
+      }
+      trigger_setRemainingShotCount(shotsRemaining - 1);
       currentState = pressed_st;
       triggerPressedFlag = true;
     }
